@@ -6,6 +6,7 @@ const {
 
 const { initializeAuth: googleInitializeAuth, getGeminiDir } = require('./google-auth');
 const { AuthType } = require('@google/gemini-cli-core/dist/src/core/contentGenerator.js');
+const { fetchAndEncode } = require('../utils/imageHandler');
 
 /**
  * Initialize authentication using OAuth2 credentials with token caching.
@@ -216,14 +217,28 @@ function messageToGeminiFormat(msg) {
       } else if (content.type === 'image_url' && content.image_url) {
         const imageUrl = content.image_url.url;
 
-        // For simplicity, we'll just handle URL images
-        // In a real implementation, you'd want to validate and possibly convert base64 images
-        parts.push({
-          fileData: {
-            mimeType: 'image/jpeg', // Default assumption
-            fileUri: imageUrl
+        // Handle data URLs by extracting the inline data
+        if (imageUrl.startsWith('data:')) {
+          // Extract data from data URL
+          const match = imageUrl.match(/^data:([^;]+);base64,(.*)$/);
+          if (match) {
+            parts.push({
+              inlineData: {
+                mimeType: match[1],
+                data: match[2]
+              }
+            });
           }
-        });
+        } else {
+          // For web URLs, we'll handle them as fileData references
+          // In a production implementation, you might want to fetch and encode them
+          parts.push({
+            fileData: {
+              mimeType: 'image/jpeg', // Default assumption
+              fileUri: imageUrl
+            }
+          });
+        }
       }
     }
 

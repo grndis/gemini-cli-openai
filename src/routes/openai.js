@@ -1,5 +1,6 @@
 const express = require("express");
 const { streamContent, geminiCliModels } = require("../services/gemini");
+const { fetchAndEncode } = require("../utils/imageHandler");
 
 const router = express.Router();
 
@@ -136,6 +137,17 @@ router.post("/chat/completions", async (req, res) => {
     // If no specific account is requested, the gemini service will use account rotation
     const accountId = req.headers["x-gemini-account-id"] || null;
 
+    // Process messages with images if needed
+    let processedMessages = otherMessages;
+    if (hasImages) {
+      try {
+        processedMessages = await processMessagesWithImages(otherMessages);
+      } catch (error) {
+        console.error("Error processing images:", error);
+        // Continue with original messages if processing fails
+      }
+    }
+
     if (stream) {
       // Streaming response
       res.set({
@@ -154,7 +166,7 @@ router.post("/chat/completions", async (req, res) => {
       try {
         // Show stream start
         console.log("\x1b[36mStarting stream generation\x1b[0m");
-        const geminiStream = streamContent(model, systemPrompt, otherMessages, {
+        const geminiStream = streamContent(model, systemPrompt, processedMessages, {
           ...(accountId && { accountId }), // Only include accountId if it's not null
           includeReasoning,
           thinkingBudget,
@@ -228,7 +240,7 @@ router.post("/chat/completions", async (req, res) => {
         for await (const chunk of streamContent(
           model,
           systemPrompt,
-          otherMessages,
+          processedMessages,
           {
             ...(accountId && { accountId }), // Only include accountId if it's not null
             includeReasoning,
@@ -407,4 +419,47 @@ function formatOpenAIFinalChunk(
   };
 }
 
-module.exports = { openaiRouter: router };
+/**
+ * Process messages to fetch and encode images
+ */
+async function processMessagesWithImages(messages) {
+  const processedMessages = [];
+  
+  for (const msg of messages) {
+    // Create a copy of the message
+    const processedMsg = { ...msg };
+    
+    // Process content if it's an array (multimodal)
+    if (Array.isArray(msg.content)) {
+      processedMsg.content = [];
+      
+      for (const content of msg.content) {
+        if (content.type === 'image_url' && content.image_url) {
+          try {
+            // Fetch and encode the image
+            const imageData = await fetchAndEncode(content.image_url.url);
+            processedMsg.content.push({
+              type: 'image_url',
+              image_url: {
+                url: `data:${imageData.mimeType};base64,${imageData.data}`
+              }
+            });
+          } catch (error) {
+            console.error('Error processing image:', error);
+            // Keep the original image URL if processing fails
+            processedMsg.content.push(content);
+          }
+        } else {
+          // Keep non-image content as is
+          processedMsg.content.push(content);
+        }
+      }
+    }
+    
+    processedMessages.push(processedMsg);
+  }
+  
+  return processedMessages;
+}
+
+module.exports = { openaiRouter: router, processMessagesWithImages };
