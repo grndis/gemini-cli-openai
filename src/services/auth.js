@@ -179,6 +179,7 @@ class GeminiAuthManager {
 
 		// Refresh default account if it exists
 		try {
+			const { loadCredentials } = require("./google-auth");
 			const defaultCredentials = loadCredentials();
 			if (defaultCredentials) {
 				// Check if token needs refresh (within buffer time)
@@ -195,6 +196,7 @@ class GeminiAuthManager {
 						defaultCredentials.refresh_token,
 					);
 					if (newCredentials) {
+						const { saveCredentials } = require("./google-auth");
 						saveCredentials(newCredentials);
 						console.log(
 							"\x1b[32m%s\x1b[0m",
@@ -238,6 +240,7 @@ class GeminiAuthManager {
 							credentials.refresh_token,
 						);
 						if (newCredentials) {
+							const { saveCredentials } = require("./google-auth");
 							saveCredentials(newCredentials, accountId);
 							console.log(
 								`\x1b[32mAccount ${accountId} token refreshed successfully\x1b[0m`,
