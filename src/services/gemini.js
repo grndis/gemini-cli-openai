@@ -497,16 +497,25 @@ async function* performStreamRequest(
               hasStartedThinking = true;
             }
 
-            yield {
-              type: 'thinking_content',
-              data: thinkingText
-            };
+            // Yield thinking text character-by-character
+            for (let i = 0; i < thinkingText.length; i++) {
+              yield {
+                type: 'thinking_content',
+                data: thinkingText[i]
+              };
+              // Add a small delay to simulate natural typing
+              await new Promise(resolve => setTimeout(resolve, 1));
+            }
           } else {
             // Stream as separate reasoning field
-            yield {
-              type: 'real_thinking',
-              data: thinkingText
-            };
+            for (let i = 0; i < thinkingText.length; i++) {
+              yield {
+                type: 'real_thinking',
+                data: thinkingText[i]
+              };
+              // Add a small delay to simulate natural typing
+              await new Promise(resolve => setTimeout(resolve, 1));
+            }
           }
         }
         // Check if text content contains <tool_call> tags
@@ -523,38 +532,65 @@ async function* performStreamRequest(
                 hasStartedThinking = true;
               }
 
-              yield {
-                type: 'thinking_content',
-                data: thinkingMatch[1]
-              };
+              // Yield thinking content character-by-character
+              const thinkingContent = thinkingMatch[1];
+              for (let i = 0; i < thinkingContent.length; i++) {
+                yield {
+                  type: 'thinking_content',
+                  data: thinkingContent[i]
+                };
+                // Add a small delay to simulate natural typing
+                await new Promise(resolve => setTimeout(resolve, 1));
+              }
             }
 
             // Extract any non-thinking content
             const nonThinkingContent = part.text.replace(/<tool_call>.*?<\/think>/gs, '').trim();
             if (nonThinkingContent) {
               if (hasStartedThinking && !hasClosedThinking) {
-                yield {
-                  type: 'thinking_content',
-                  data: '\n</thinking>\n\n'
-                };
+                const closingTag = '\n</thinking>\n\n';
+                for (let i = 0; i < closingTag.length; i++) {
+                  yield {
+                    type: 'thinking_content',
+                    data: closingTag[i]
+                  };
+                  // Add a small delay to simulate natural typing
+                  await new Promise(resolve => setTimeout(resolve, 1));
+                }
                 hasClosedThinking = true;
               }
-              yield { type: 'text', data: nonThinkingContent };
+              // Yield non-thinking content character-by-character
+              for (let i = 0; i < nonThinkingContent.length; i++) {
+                yield { type: 'text', data: nonThinkingContent[i] };
+                // Add a small delay to simulate natural typing
+                await new Promise(resolve => setTimeout(resolve, 1));
+              }
             }
           } else {
             // Stream thinking as separate reasoning field
             const thinkingMatch = part.text.match(/<tool_call>(.*?)<\/think>/s);
             if (thinkingMatch) {
-              yield {
-                type: 'real_thinking',
-                data: thinkingMatch[1]
-              };
+              // Yield thinking text character-by-character
+              const thinkingContent = thinkingMatch[1];
+              for (let i = 0; i < thinkingContent.length; i++) {
+                yield {
+                  type: 'real_thinking',
+                  data: thinkingContent[i]
+                };
+                // Add a small delay to simulate natural typing
+                await new Promise(resolve => setTimeout(resolve, 1));
+              }
             }
 
             // Stream non-thinking content as regular text
             const nonThinkingContent = part.text.replace(/<tool_call>.*?<\/think>/gs, '').trim();
             if (nonThinkingContent) {
-              yield { type: 'text', data: nonThinkingContent };
+              // Yield non-thinking text character-by-character
+              for (let i = 0; i < nonThinkingContent.length; i++) {
+                yield { type: 'text', data: nonThinkingContent[i] };
+                // Add a small delay to simulate natural typing
+                await new Promise(resolve => setTimeout(resolve, 1));
+              }
             }
           }
         }
@@ -569,7 +605,13 @@ async function* performStreamRequest(
             hasClosedThinking = true;
           }
 
-          yield { type: 'text', data: part.text };
+          // Yield text character-by-character for natural streaming
+          const text = part.text;
+          for (let i = 0; i < text.length; i++) {
+            yield { type: 'text', data: text[i] };
+            // Add a small delay to simulate natural typing
+            await new Promise(resolve => setTimeout(resolve, 1));
+          }
         }
         // Handle function calls from Gemini
         else if (part.functionCall) {

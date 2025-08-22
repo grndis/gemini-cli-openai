@@ -18,6 +18,19 @@ app.use(cors());
 app.use(json({ limit: "10mb" }));
 app.use(urlencoded({ extended: true }));
 
+// Disable Express default response buffering for streaming
+app.use((req, res, next) => {
+  // Disable Nagle's algorithm to reduce latency
+  req.socket.setNoDelay(true);
+  
+  // Set appropriate headers for streaming
+  res.setHeader('X-Content-Type-Options', 'nosniff');
+  res.setHeader('Cache-Control', 'no-cache');
+  res.setHeader('Connection', 'keep-alive');
+  
+  next();
+});
+
 // Routes
 app.use("/", healthRouter);
 app.use("/auth", authRouter);

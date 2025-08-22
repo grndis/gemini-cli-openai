@@ -197,6 +197,10 @@ router.post("/chat/completions", async (req, res) => {
           );
           if (openAIChunk) {
             res.write(`data: ${JSON.stringify(openAIChunk)}\n\n`);
+            // Flush the response immediately to ensure real-time streaming
+            if (res.flush) {
+              res.flush();
+            }
           }
         }
 
@@ -209,7 +213,13 @@ router.post("/chat/completions", async (req, res) => {
           finishReason,
         );
         res.write(`data: ${JSON.stringify(finalChunk)}\n\n`);
+        if (res.flush) {
+          res.flush();
+        }
         res.write("data: [DONE]\n\n");
+        if (res.flush) {
+          res.flush();
+        }
         res.end();
         // Show stream completion
         console.log("\x1b[36mStream completed successfully\x1b[0m");
@@ -223,7 +233,13 @@ router.post("/chat/completions", async (req, res) => {
         res.write(
           `data: ${JSON.stringify({ error: { message: errorMessage, type: "service_unavailable" } })}\n\n`,
         );
+        if (res.flush) {
+          res.flush();
+        }
         res.write("data: [DONE]\n\n");
+        if (res.flush) {
+          res.flush();
+        }
         res.end();
       }
     } else {
