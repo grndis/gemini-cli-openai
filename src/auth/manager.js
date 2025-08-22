@@ -190,7 +190,7 @@ class GeminiAuthManager {
 						"\x1b[33m%s\x1b[0m",
 						"Refreshing default account token...",
 					);
-					const { refreshAndCacheToken } = require("./gemini");
+					const { refreshAndCacheToken } = require("../services/gemini");
 					const newCredentials = await refreshAndCacheToken(
 						"default",
 						defaultCredentials.refresh_token,
@@ -232,7 +232,7 @@ class GeminiAuthManager {
 						console.log(
 							`\x1b[33mRefreshing account ${accountId} token...\x1b[0m`,
 						);
-						const { refreshAndCacheToken } = require("./gemini");
+						const { refreshAndCacheToken } = require("../services/gemini");
 						const newCredentials = await refreshAndCacheToken(
 							accountId,
 							credentials.refresh_token,
@@ -417,7 +417,7 @@ class GeminiAuthManager {
 	async testAccount(accountId) {
 		try {
 			// Import required functions
-			const { initializeAuth, discoverProjectId } = require("./gemini");
+			const { initializeAuth, discoverProjectId } = require("../services/gemini");
 
 			// Get access token for the account
 			const accessToken = await initializeAuth(accountId);
