@@ -5,8 +5,9 @@ const {
   removeAccount,
   loadAllAccounts,
   isTokenValid
-} = require('../services/auth');
-const { loadCredentials } = require('../services/google-auth');
+} = require('./manager');
+const { loadCredentials } = require('./oauth-client');
+const { sendInternalServerError, sendBadRequest, sendNotFound } = require('../utils/errorHandler');
 
 const router = express.Router();
 
@@ -23,7 +24,7 @@ router.get('/url', (req, res) => {
     const redirectUri = `${baseUrl}/auth/callback`;
     
     // Import generateState from auth service
-    const { generateState } = require('../services/auth');
+    const { generateState } = require('./manager');
     const state = generateState();
     
     // Import config constants
@@ -64,7 +65,7 @@ router.get('/url', (req, res) => {
     });
   } catch (error) {
     console.error('Error generating auth URL:', error);
-    res.status(500).json({ error: 'Failed to generate authentication URL' });
+    sendInternalServerError(res, 'Failed to generate authentication URL', null, error);
   }
 });
 
@@ -76,23 +77,16 @@ router.get('/callback', async (req, res) => {
     const { code, error, state } = req.query;
     
     if (error) {
-      return res.status(400).json({ 
-        error: "OAuth2 authorization failed", 
-        details: error 
-      });
+      return sendBadRequest(res, "OAuth2 authorization failed", error);
     }
     
     if (!code) {
-      return res.status(400).json({ 
-        error: "Missing authorization code" 
-      });
+      return sendBadRequest(res, "Missing authorization code");
     }
     
     // Validate state parameter for CSRF protection
     if (!global.oauthStates || !global.oauthStates.has(state)) {
-      return res.status(400).json({ 
-        error: "Invalid or expired state parameter" 
-      });
+      return sendBadRequest(res, "Invalid or expired state parameter");
     }
     
     const stateData = global.oauthStates.get(state);
@@ -134,10 +128,7 @@ router.get('/callback', async (req, res) => {
     if (!tokenResponse.ok) {
       const errorText = await tokenResponse.text();
       console.error("Token exchange failed:", errorText);
-      return res.status(500).json({ 
-        error: "Failed to exchange authorization code for tokens",
-        details: errorText
-      });
+      return sendInternalServerError(res, "Failed to exchange authorization code for tokens", errorText);
     }
 
     const tokenData = await tokenResponse.json();
@@ -157,14 +148,11 @@ router.get('/callback', async (req, res) => {
     
     // Save credentials to file
     try {
-      const { saveCredentials } = require('../services/google-auth');
+      const { saveCredentials } = require('./oauth-client');
       saveCredentials(credentials, accountId);
     } catch (saveError) {
       console.error('❌ Error saving credentials:', saveError.message);
-      return res.status(500).json({ 
-        error: "Authentication successful but failed to save credentials",
-        details: saveError.message
-      });
+      return sendInternalServerError(res, "Authentication successful but failed to save credentials", saveError.message, saveError);
     }
     
     res.json({
@@ -174,10 +162,7 @@ router.get('/callback', async (req, res) => {
     });
   } catch (error) {
     console.error("OAuth2 callback error:", error);
-    res.status(500).json({ 
-      error: "Failed to complete OAuth2 flow",
-      details: error.message
-    });
+    sendInternalServerError(res, "Failed to complete OAuth2 flow", error.message, error);
   }
 });
 
@@ -190,7 +175,7 @@ router.get('/accounts', (req, res) => {
     res.json({ accounts });
   } catch (error) {
     console.error('Error listing accounts:', error);
-    res.status(500).json({ error: 'Failed to list accounts' });
+    sendInternalServerError(res, 'Failed to list accounts', null, error);
   }
 });
 
@@ -204,11 +189,11 @@ router.delete('/accounts/:accountId', (req, res) => {
     if (result.success) {
       res.json(result);
     } else {
-      res.status(404).json(result);
+      sendNotFound(res, result.error);
     }
   } catch (error) {
     console.error('Error removing account:', error);
-    res.status(500).json({ error: 'Failed to remove account', details: error.message });
+    sendInternalServerError(res, 'Failed to remove account', error.message, error);
   }
 });
 

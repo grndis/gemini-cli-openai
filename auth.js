@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 
-const { authenticateAccount, listAccounts, removeAccount } = require('./src/services/auth');
+const { authenticateAccount, listAccounts, removeAccount } = require('./src/auth/manager');
 
 // Parse command line arguments
 const args = process.argv.slice(2);

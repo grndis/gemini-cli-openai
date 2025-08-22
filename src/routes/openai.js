@@ -1,6 +1,8 @@
 const express = require("express");
 const { streamContent, geminiCliModels } = require("../services/gemini");
 const { fetchAndEncode } = require("../utils/imageHandler");
+const { generateChatId, generateToolCallId, getCurrentTimestamp } = require("../utils/idGenerator");
+const { sendBadRequest, sendInternalServerError } = require("../utils/errorHandler");
 
 const router = express.Router();
 
@@ -11,7 +13,7 @@ router.get("/models", (req, res) => {
   const modelData = Object.keys(geminiCliModels).map((modelId) => ({
     id: modelId,
     object: "model",
-    created: Math.floor(Date.now() / 1000),
+    created: getCurrentTimestamp(),
     owned_by: "google-gemini-cli",
   }));
 
@@ -89,14 +91,12 @@ router.post("/chat/completions", async (req, res) => {
     }
 
     if (!messages.length) {
-      return res.status(400).json({ error: "messages is a required field" });
+      return sendBadRequest(res, "messages is a required field");
     }
 
     // Validate model
     if (!(model in geminiCliModels)) {
-      return res.status(400).json({
-        error: `Model '${model}' not found. Available models: ${Object.keys(geminiCliModels).join(", ")}`,
-      });
+      return sendBadRequest(res, `Model '${model}' not found. Available models: ${Object.keys(geminiCliModels).join(", ")}`);
     }
 
     // Check if the request contains images and validate model support
@@ -108,9 +108,7 @@ router.post("/chat/completions", async (req, res) => {
     });
 
     if (hasImages && !geminiCliModels[model].supportsImages) {
-      return res.status(400).json({
-        error: `Model '${model}' does not support image inputs. Please use a vision-capable model like gemini-2.5-pro or gemini-2.5-flash.`,
-      });
+      return sendBadRequest(res, `Model '${model}' does not support image inputs. Please use a vision-capable model like gemini-2.5-pro or gemini-2.5-flash.`);
     }
 
     // Extract system prompt and user/assistant messages
@@ -159,8 +157,8 @@ router.post("/chat/completions", async (req, res) => {
         "Access-Control-Allow-Headers": "Content-Type, Authorization",
       });
 
-      const chatID = `chatcmpl-${Math.random().toString(36).substr(2, 9)}`;
-      const creationTime = Math.floor(Date.now() / 1000);
+      const chatID = generateChatId();
+      const creationTime = getCurrentTimestamp();
       let firstChunk = true;
 
       try {
@@ -259,9 +257,9 @@ router.post("/chat/completions", async (req, res) => {
         }
 
         const response = {
-          id: `chatcmpl-${Math.random().toString(36).substr(2, 9)}`,
+          id: generateChatId(),
           object: "chat.completion",
-          created: Math.floor(Date.now() / 1000),
+          created: getCurrentTimestamp(),
           model: model,
           choices: [
             {
@@ -294,9 +292,7 @@ router.post("/chat/completions", async (req, res) => {
           process.env.NODE_ENV === "development"
             ? completionError.message
             : "Service temporarily unavailable. Please try again.";
-        res.status(500).json({
-          error: { message: errorMessage, type: "service_unavailable" },
-        });
+        sendInternalServerError(res, errorMessage, null, completionError);
       }
     }
   } catch (e) {
@@ -306,9 +302,7 @@ router.post("/chat/completions", async (req, res) => {
       process.env.NODE_ENV === "development"
         ? e.message
         : "Service temporarily unavailable. Please try again.";
-    res
-      .status(500)
-      .json({ error: { message: errorMessage, type: "service_unavailable" } });
+    sendInternalServerError(res, errorMessage, null, e);
   }
 });
 
@@ -363,7 +357,7 @@ function formatOpenAIChunk(chunk, model, chatID, creationTime) {
         chunk.data.name &&
         chunk.data.args
       ) {
-        const toolCallId = `call_${Math.random().toString(36).substr(2, 9)}`;
+        const toolCallId = generateToolCallId();
         return {
           id: chatID,
           object: "chat.completion.chunk",

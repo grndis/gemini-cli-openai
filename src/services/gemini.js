@@ -4,7 +4,7 @@ const {
   TOKEN_REFRESH_BUFFER_MS
 } = require('../config');
 
-const { initializeAuth: googleInitializeAuth, getGeminiDir } = require('./google-auth');
+const { initializeAuth: googleInitializeAuth, getGeminiDir } = require('../auth/oauth-client');
 const { AuthType } = require('@google/gemini-cli-core/dist/src/core/contentGenerator.js');
 const { fetchAndEncode } = require('../utils/imageHandler');
 
@@ -28,7 +28,7 @@ async function initializeAuth(accountId = 'default') {
 async function refreshAndCacheToken(accountId, refreshToken) {
   try {
     // Use the new Google Auth implementation
-    const { refreshAndCacheToken } = require('./google-auth');
+    const { refreshAndCacheToken } = require('../auth/oauth-client');
     return await refreshAndCacheToken(accountId, refreshToken);
   } catch (error) {
     console.error('Token refresh failed:', error.message);
@@ -611,13 +611,13 @@ async function* performStreamRequest(
  */
 async function* streamContent(modelId, systemPrompt, messages, options = {}) {
   // Import auth manager
-  const { authManager } = require('./auth');
+  const { authManager } = require('../auth/manager');
   
   // Get all available accounts for rotation
   let allAccounts = null;
   if (!options.accountId) {
     // Load all accounts to check if we have accounts
-    allAccounts = require('./auth').loadAllAccounts();
+    allAccounts = require('../auth/manager').loadAllAccounts();
     if (process.env.NODE_ENV !== 'development' && process.env.SHOW_DETAILED_LOGS === 'true') {
       console.log(`\x1b[36mDebug: Found ${allAccounts.size} accounts\x1b[0m`);
     }

@@ -4,10 +4,11 @@ require("dotenv").config({ path: __dirname + "/../.env" });
 const express = require("express");
 const cors = require("cors");
 const { json, urlencoded } = require("body-parser");
-const { authRouter } = require("./routes/auth");
+const { authRouter } = require("./auth/routes");
 const { openaiRouter } = require("./routes/openai");
 const { healthRouter } = require("./routes/health");
-const { authManager } = require("./services/auth");
+const { authManager } = require("./auth/manager");
+const { sendInternalServerError, sendNotFound } = require("./utils/errorHandler");
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -25,12 +26,12 @@ app.use("/v1", openaiRouter);
 // Error handling middleware
 app.use((err, req, res, next) => {
   console.error(err.stack);
-  res.status(500).json({ error: "Something went wrong!" });
+  sendInternalServerError(res, "Something went wrong!", null, err);
 });
 
 // 404 handler
 app.use((req, res) => {
-  res.status(404).json({ error: "Route not found" });
+  sendNotFound(res, "Route not found");
 });
 
 const server = app.listen(PORT, '0.0.0.0', () => {
@@ -75,8 +76,8 @@ const server = app.listen(PORT, '0.0.0.0', () => {
       }
     } else {
       // Check if default account exists
-      const { loadCredentials } = require("./services/google-auth");
-      const { isTokenValid } = require("./services/auth");
+      const { loadCredentials } = require("./auth/oauth-client");
+      const { isTokenValid } = require("./auth/manager");
       const defaultCredentials = loadCredentials();
       if (defaultCredentials) {
         const isValid = isTokenValid(defaultCredentials);

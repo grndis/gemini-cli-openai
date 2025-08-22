@@ -179,7 +179,7 @@ class GeminiAuthManager {
 
 		// Refresh default account if it exists
 		try {
-			const { loadCredentials } = require("./google-auth");
+			const { loadCredentials } = require("./oauth-client");
 			const defaultCredentials = loadCredentials();
 			if (defaultCredentials) {
 				// Check if token needs refresh (within buffer time)
@@ -224,7 +224,7 @@ class GeminiAuthManager {
 		// Refresh all multi-account tokens
 		for (const accountId of accountIds) {
 			try {
-				const { loadCredentials } = require("./google-auth");
+				const { loadCredentials } = require("./oauth-client");
 				const credentials = loadCredentials(accountId);
 				if (credentials) {
 					// Check if token needs refresh (within buffer time)
@@ -297,7 +297,7 @@ class GeminiAuthManager {
 					(this.currentAccountIndex + 1) % accountIds.length;
 			}
 
-			const { loadCredentials } = require("./google-auth");
+			const { loadCredentials } = require("./oauth-client");
 			const credentials = loadCredentials(accountId);
 
 			// Check if the account is valid
@@ -334,7 +334,7 @@ class GeminiAuthManager {
 					(this.currentAccountIndex + 1) % accountIds.length;
 			}
 
-			const { loadCredentials } = require("./google-auth");
+			const { loadCredentials } = require("./oauth-client");
 			const credentials = loadCredentials(accountId);
 			console.log(
 				`\x1b[36mRandom account selection enabled. Selected account: ${accountId}\x1b[0m`,
@@ -382,7 +382,7 @@ class GeminiAuthManager {
 				accountId = accountIds[this.currentAccountIndex];
 			}
 
-			const { loadCredentials } = require("./google-auth");
+			const { loadCredentials } = require("./oauth-client");
 			const credentials = loadCredentials(accountId);
 
 			// Check if the account is valid
@@ -400,7 +400,7 @@ class GeminiAuthManager {
 				? accountIds[Math.floor(Math.random() * accountIds.length)]
 				: accountIds[this.currentAccountIndex];
 
-			const { loadCredentials } = require("./google-auth");
+			const { loadCredentials } = require("./oauth-client");
 			const credentials = loadCredentials(accountId);
 			return { accountId, credentials };
 		}
@@ -904,7 +904,7 @@ module.exports = {
 			const credentials = await exchangeCodeForTokens(code, port);
 
 			// Save credentials
-			const { saveCredentials } = require("./google-auth");
+			const { saveCredentials } = require("./oauth-client");
 			saveCredentials(credentials, accountId);
 
 			console.log(`\n🎉 Authentication successful for account ${accountId}!`);
