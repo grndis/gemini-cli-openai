@@ -45,13 +45,83 @@ async function discoverProjectId(accessToken) {
   }
 
   try {
-    // For OAuth personal authentication, we don't need a project ID
-    // as we're using the direct Gemini API
-    const authType = process.env.AUTH_TYPE || AuthType.LOGIN_WITH_GOOGLE;
+    // For OAuth personal authentication, we need to get the project ID through the setup process
+    const authType = process.env.AUTH_TYPE || AuthType.LOGIN_WITH_GOOGLE_PERSONAL;
     
-    if (authType === AuthType.LOGIN_WITH_GOOGLE) {
-      // For personal OAuth, we don't need a project ID
-      return null;
+    if (authType === AuthType.LOGIN_WITH_GOOGLE_PERSONAL) {
+      // For personal OAuth, we need to get the project ID through the API
+      const initialProjectId = process.env.GOOGLE_CLOUD_PROJECT || null;
+      
+      // Call loadCodeAssist to get project information
+      const loadResponse = await fetch(`${CODE_ASSIST_ENDPOINT}/${CODE_ASSIST_API_VERSION}:loadCodeAssist`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${accessToken}`
+        },
+        body: JSON.stringify({
+          cloudaicompanionProject: initialProjectId,
+          metadata: { 
+            duetProject: initialProjectId,
+            ideType: 'IDE_UNSPECIFIED',
+            platform: 'PLATFORM_UNSPECIFIED',
+            pluginType: 'GEMINI'
+          }
+        })
+      });
+
+      if (loadResponse.ok) {
+        const data = await loadResponse.json();
+        
+        // Get the proper project ID from the response
+        let projectId = initialProjectId;
+        if (!projectId && data.cloudaicompanionProject) {
+          projectId = data.cloudaicompanionProject;
+        }
+        
+        // Get the user tier
+        const tier = data.currentTier || (data.allowedTiers || []).find(tier => tier.isDefault) || {
+          id: 'LEGACY',
+          userDefinedCloudaicompanionProject: !!initialProjectId
+        };
+        
+        // If the tier requires a user-defined project but we don't have one, throw an error
+        if (tier.userDefinedCloudaicompanionProject && !projectId) {
+          throw new Error('This account requires setting the GOOGLE_CLOUD_PROJECT environment variable.');
+        }
+        
+        // Call onboardUser to complete the setup process
+        const onboardReq = {
+          tierId: tier.id,
+          cloudaicompanionProject: projectId,
+          metadata: {
+            duetProject: projectId,
+            ideType: 'IDE_UNSPECIFIED',
+            platform: 'PLATFORM_UNSPECIFIED',
+            pluginType: 'GEMINI'
+          }
+        };
+        
+        // Make the onboardUser call
+        const onboardResponse = await fetch(`${CODE_ASSIST_ENDPOINT}/${CODE_ASSIST_API_VERSION}:onboardUser`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${accessToken}`
+          },
+          body: JSON.stringify(onboardReq)
+        });
+        
+        if (onboardResponse.ok) {
+          const onboardData = await onboardResponse.json();
+          // Get the final project ID from the response
+          const finalProjectId = onboardData.response?.cloudaicompanionProject?.id || projectId || '';
+          return finalProjectId;
+        }
+      }
+      
+      // If setup fails, return empty string for personal OAuth
+      return '';
     }
 
     const initialProjectId = "default-project";
@@ -79,7 +149,12 @@ async function discoverProjectId(accessToken) {
     return "default-project";
   } catch (error) {
     console.error("Failed to discover project ID:", error.message);
-    // Fall back to default project ID
+    // For personal OAuth, return empty string on error
+    const authType = process.env.AUTH_TYPE || AuthType.LOGIN_WITH_GOOGLE_PERSONAL;
+    if (authType === AuthType.LOGIN_WITH_GOOGLE_PERSONAL) {
+      return '';
+    }
+    // Fall back to default project ID for other auth types
     return "default-project";
   }
 }
@@ -357,27 +432,18 @@ async function* performStreamRequest(
   }
   
   // Determine which endpoint to use based on auth type
-  const authType = process.env.AUTH_TYPE || AuthType.LOGIN_WITH_GOOGLE;
+  const authType = process.env.AUTH_TYPE || AuthType.LOGIN_WITH_GOOGLE_PERSONAL;
   let response;
   
-  if (authType === AuthType.LOGIN_WITH_GOOGLE) {
-    // Use the direct Gemini API endpoint for personal OAuth
-    const GEMINI_API_ENDPOINT = 'https://generativelanguage.googleapis.com';
-    const GEMINI_API_VERSION = 'v1beta';
-    
-    response = await fetch(`${GEMINI_API_ENDPOINT}/${GEMINI_API_VERSION}/models/${streamRequest.model}:streamGenerateContent`, {
+  if (authType === AuthType.LOGIN_WITH_GOOGLE_PERSONAL) {
+    // Use the Code Assist endpoint for personal OAuth (same as gemini-cli-core)
+    response = await fetch(`${CODE_ASSIST_ENDPOINT}/${CODE_ASSIST_API_VERSION}:streamGenerateContent?alt=sse`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
         Authorization: `Bearer ${accessToken}`
       },
-      body: JSON.stringify({
-        contents: streamRequest.request.contents,
-        generationConfig: streamRequest.request.generationConfig,
-        safetySettings: streamRequest.request.safetySettings,
-        tools: streamRequest.request.tools,
-        toolConfig: streamRequest.request.toolConfig
-      })
+      body: JSON.stringify(streamRequest)
     });
   } else {
     // Use the Google Cloud endpoint for other auth types
@@ -683,8 +749,8 @@ async function* streamContent(modelId, systemPrompt, messages, options = {}) {
         if (error.message && error.message.includes('403')) {
           console.log('API permission error (403), immediately switching to different account');
           // For OAuth personal authentication, we should not switch accounts as it's a single account
-          const authType = process.env.AUTH_TYPE || AuthType.LOGIN_WITH_GOOGLE;
-          if (authType === AuthType.LOGIN_WITH_GOOGLE) {
+          const authType = process.env.AUTH_TYPE || AuthType.LOGIN_WITH_GOOGLE_PERSONAL;
+          if (authType === AuthType.LOGIN_WITH_GOOGLE_PERSONAL) {
             console.log('Using OAuth personal authentication, not switching accounts');
             // For personal OAuth, we should not switch accounts
             throw error;

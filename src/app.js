@@ -33,11 +33,15 @@ app.use((req, res) => {
   res.status(404).json({ error: "Route not found" });
 });
 
-app.listen(PORT, () => {
+const server = app.listen(PORT, '0.0.0.0', () => {
   console.log(`\x1b[36mProxy listening on port ${PORT}\x1b[0m`);
   console.log(
     `\x1b[36mUsing credentials from ~/.gemini/oauth_creds.json\x1b[0m`,
   );
+  
+  // Debug information
+  const address = server.address();
+  console.log(`\x1b[36mServer address: ${JSON.stringify(address)}\x1b[0m`);
 
   // Start background token refresh service if enabled
   if (process.env.BACKGROUND_TOKEN_REFRESH === "true") {
@@ -88,4 +92,9 @@ app.listen(PORT, () => {
   } catch (error) {
     console.log("\x1b[33mWarning: Could not load account information\x1b[0m");
   }
+});
+
+server.on('error', (error) => {
+  console.error(`\x1b[31mServer error: ${error.message}\x1b[0m`);
+  process.exit(1);
 });
